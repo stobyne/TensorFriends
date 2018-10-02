@@ -4,15 +4,15 @@ import re
 
 def preprocess_data(file_path, test_pct):
 
-    choko = pd.read_csv(file_path)
+    cacao = pd.read_csv(file_path)
 
-    original_colnames = choko.columns
+    original_colnames = cacao.columns
     new_colnames = ['company', 'species', 'REF', 'review_year', 'cocoa_p',
                     'company_location', 'rating', 'bean_typ', 'country']
-    choko = choko.rename(columns=dict(zip(original_colnames, new_colnames)))
+    cacao = cacao.rename(columns=dict(zip(original_colnames, new_colnames)))
     ## And modify data types
-    choko['cocoa_p'] = choko['cocoa_p'].str.replace('%','').astype(float)/100
-    choko['country'] = choko['country'].fillna(choko['species'])
+    cacao['cocoa_p'] = cacao['cocoa_p'].str.replace('%','').astype(float)/100
+    cacao['country'] = cacao['country'].fillna(cacao['species'])
 
     def txt_prep(text):
         replacements = [
@@ -39,45 +39,43 @@ def preprocess_data(file_path, test_pct):
             text = re.sub(i, j, text)
         return text
 
-    choko['country'] = choko['country'].str.replace('.', '').apply(txt_prep)
+    cacao['country'] = cacao['country'].str.replace('.', '').apply(txt_prep)
 
-    choko['company_location'] = choko['company_location']\
+    cacao['company_location'] = cacao['company_location']\
         .str.replace('Amsterdam', 'Holland')\
         .str.replace('U.K.', 'England')\
         .str.replace('Niacragua', 'Nicaragua')\
         .str.replace('Domincan Republic', 'Dominican Republic')
     
     ## Let's define blend feature
-    choko['is_blend'] = np.where(
+    cacao['is_blend'] = np.where(
         np.logical_or(
-            np.logical_or(choko['species'].str.lower().str.contains(',|(blend)|;'),
-                        choko['country'].str.len() == 1),
-            choko['country'].str.lower().str.contains(',')
+            np.logical_or(cacao['species'].str.lower().str.contains(',|(blend)|;'),
+                        cacao['country'].str.len() == 1),
+            cacao['country'].str.lower().str.contains(',')
         )
         , 1
         , 0)
     
-    choko['is_domestic'] = np.where(choko['country'] == choko['company_location'], 1, 0)
-    choko = choko.drop(columns=['bean_typ'])
+    cacao['is_domestic'] = np.where(cacao['country'] == cacao['company_location'], 1, 0)
+    cacao = cacao.drop(columns=['bean_typ'])
 
-    label = ['rating']
-    y = choko[label]
-
-    choko = choko.astype({'REF':object, 'review_year':object})
+    cacao = cacao.astype({'REF':object, 'review_year':object})
 
     cat_columns = ['company', 'species', 'REF', 'review_year', 'company_location', 'country', 'is_blend', 'is_domestic']
     num_columns = ['cocoa_p']
-    one_hot_cat_df = pd.get_dummies(choko[cat_columns])
+    one_hot_cat_df = pd.get_dummies(cacao[cat_columns])
 
-    choko = pd.concat([one_hot_cat_df, choko[num_columns]], axis=1)
+    cacao_df = pd.concat([one_hot_cat_df, cacao[num_columns]], axis=1)
+    y = cacao['rating'].values
 
     test_size = test_pct
     train_size = 1 - test_size
-    split_row = int(train_size * choko.shape[0])
-    x_train = choko.loc[0:split_row,:]
-    x_test = choko.loc[split_row + 1:,:]
+    split_row = int(train_size * cacao.shape[0])
+    x_train = cacao_df.loc[0:split_row,:].values
+    x_test = cacao_df.loc[split_row + 1:,:].values
 
-    y_train = y.loc[0:split_row,:]
-    y_test = y.loc[split_row + 1,:]
+    y_train = y[0:split_row]
+    y_test = y[(split_row + 1):]
 
     return x_train, x_test, y_train, y_test
