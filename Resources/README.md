@@ -7,4 +7,5 @@ This is a collection of web articles and resources that have been helpful in lea
 ## Unofficial Documentation
 
 [A Concise Handbook of TensorFlow](https://github.com/snowkylin/TensorFlow-cn/releases)
+
 [Duke STA-663](https://people.duke.edu/~ccc14/sta-663-2017/21_TensorFlow_Edward.html#tensorflow)
