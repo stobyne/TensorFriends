@@ -2,7 +2,6 @@ class PredictChocolateRatings(object):
     def __init__(self, hparams):
         self.hparams = hparams 
         self.weights_dict = {'w': None, 'b': None}
-        self.y_posterior = None
         
     def fit(self):
         N = x_train.shape[0]  # Number of rows in training data
@@ -20,14 +19,14 @@ class PredictChocolateRatings(object):
         qb = Normal(loc=tf.get_variable('qb/loc', [1]),
                     scale=tf.nn.softplus(tf.get_variable('qb/scale', [1])))  # Variational parameter
 
-        data = preprocess_data.generator([x_train, y_train], hparams.batch_size)
+        data = preprocess_data.generator([x_train, y_train], hparams.batch_size)  # Passes data in as batches
 
-        n_batch = int(N / hparams.batch_size)
+        n_batch = int(N / hparams.batch_size)  # Scaling parameter
 
         inference = ed.KLqp({w: qw, b: qb}, data={y: y_ph}) # Reverse variational inference
         inference.initialize(
-            n_iter=n_batch * hparams.num_epoch, n_samples=hparams.num_samples, scale={y: N / hparams.batch_size}, 
-            logdir='log')
+            n_iter=n_batch * hparams.num_epoch, n_samples=hparams.gradient_samples, scale={y: N / hparams.batch_size}, 
+            logdir='log')  # Use TensorBoard to visaulize loss
         tf.global_variables_initializer().run()
 
         for _ in range(inference.n_iter):
@@ -35,10 +34,32 @@ class PredictChocolateRatings(object):
             info_dict = inference.update({x_ph:X_batch, y_ph: y_batch})
             inference.print_progress(info_dict)
         
-        self.weights_dict['w'] = qw.sample(hparams.num_samples).eval()
-        self.weights_dict['b'] = qw.sample(hparams.num_samples).eval()
+        self.weights_dict['w'] = qw.sample(hparams.num_samples).eval()  # Store weight samples in dictionary
+        self.weights_dict['b'] = qw.sample(hparams.num_samples).eval()  # Store bias samples in dictionary
            
-    def evaluate(self, input_fn):
-        print('to be completed')
-    def visualize_weights(self, input_fn):
-        print('to be completed')
+    def evaluate(self):
+        w_ = np.mean(self.weights_dict['w'], 0)  # Get mean of posterior distribution for each weight
+        b_ = np.mean(self.weights_dict['b'])
+
+        predicted = np.dot(x_test, w_) + b_
+
+        mse = mean_absolute_error(y_test, predicted)
+        absolute_mse = mean_squared_error(y_test, predicted)
+
+        print('The mse is', mse, 'and the absolute mse is', absolute_mse)
+    
+    def visualize_weights(self):
+        
+        w_ = np.mean(predict_ratings.weights_dict['w'], 0)
+        max_indices = np.argpartition(w_, -5)[-5:]
+        min_indices = np.argpartition(w_, 5)[:5]
+        max_min_indices = np.concatenate((max_indices, min_indices))
+        names = feature_names[max_min_indices]
+        
+        selected_weights = predict_ratings.weights_dict['w'][:,max_min_indices]
+        weights_df = pd.DataFrame(selected_weights)
+        weights_df.columns = names
+        tidy_df = pd.melt(weights_df, var_name='feature')
+        
+        g = sns.FacetGrid(tidy_df, col='feature', col_wrap=5)
+        g.map(sns.kdeplot, "value", shade = True)
